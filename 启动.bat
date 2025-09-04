@@ -1,0 +1,455 @@
+chcp 65001 >nul
+@echo off
+TITLE FFmpeg Batch
+setlocal enabledelayedexpansion
+
+echo ==================================================
+echo 欢迎使用 FFmpeg 批量转码脚本 (Windows 批处理版本)
+echo ==================================================
+
+:: 设置工作目录为批处理文件所在目录
+cd /d "%~dp0"
+
+:: 用户选择源文件编码格式
+
+:select_encode
+
+echo.
+
+echo 请选择源文件的编码格式（推荐使用MediaInfo工具获取源文件详细信息）:
+
+echo 1) H.264
+echo 2) HEVC/H.265
+echo 3) AV1
+
+echo.
+
+set /p "encode_choice=请输入选项编号 (1-3): "
+
+if "%encode_choice%"=="1" (
+    set "SOURCE_ENCODE=h264"
+) else if "%encode_choice%"=="2" (
+    set "SOURCE_ENCODE=hevc"
+) else if "%encode_choice%"=="3" (
+    set "SOURCE_ENCODE=av1"
+) else (
+
+    echo 无效的选择，请重新输入
+
+    timeout /t 1 >nul
+    cls
+    goto select_encode
+)
+
+:: 用户选择解码方式
+
+:select_decode
+
+echo.
+
+echo 请选择解码方式（当前仅提供常用的配置选项）:
+
+echo 1) cpu软件解码（兼容性最好）
+
+echo 2) NVIDIA显卡硬件解码
+
+echo 3) Intel显卡硬件解码（QSV YES）
+
+echo 4) AMD显卡硬件解码（暂未测试）
+
+echo.
+
+set /p "decode_choice=请输入选项编号 (1-4): "
+
+if "%decode_choice%"=="1" (
+    set "VIDEO_DECODER="
+) else if "%decode_choice%"=="2" (
+    set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_cuvid"
+) else if "%decode_choice%"=="3" (
+    set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_qsv"
+) else if "%decode_choice%"=="4" (
+    set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_amf"
+) else (
+
+    echo 无效的选择，请重新输入
+
+    timeout /t 1 >nul
+    cls
+    goto select_decode
+)
+
+:: 用户选择目标编码
+
+:select_encode_method
+
+echo.
+
+echo 请选择目标编码
+
+echo 1) H.264
+echo 2) HEVC/H.265
+echo 3) AV1
+
+echo.
+
+set /p "encoding_method_choice=请输入选项编号 (1-3): "
+
+if "%encoding_method_choice%"=="1" (
+    set "TARGET_ENCODE=h264"
+) else if "%encoding_method_choice%"=="2" (
+    set "TARGET_ENCODE=hevc"
+) else if "%encoding_method_choice%"=="3" (
+    set "TARGET_ENCODE=av1"
+) else (
+
+    echo 无效的选择，请重新输入
+
+    timeout /t 1 >nul
+    cls
+    goto select_encode_method
+)
+
+:: 用户选择编码方式
+
+:select_target_encode
+
+echo.
+
+echo 请选择编码方式:
+
+echo 1) CPU软编码（兼容性最好，但速度慢，资源消耗大）
+
+echo 2) NVIDIA显卡硬件编码(NVENC YES)
+
+echo 3) Intel显卡硬件编码
+
+echo 4) AMD显卡硬件编码（暂未测试）
+
+echo.
+
+set /p "target_encode_choice=请输入选项编号 (1-4): "
+
+if "%target_encode_choice%"=="1" (
+    set "VIDEO_ENCODER="
+) else if "%target_encode_choice%"=="2" (
+    set "VIDEO_ENCODER=-c:v %TARGET_ENCODE%_nvenc"
+) else if "%target_encode_choice%"=="3" (
+    set "VIDEO_ENCODER=-c:v %TARGET_ENCODE%_qsv"
+) else if "%target_encode_choice%"=="4" (
+    set "VIDEO_ENCODER=-c:v %TARGET_ENCODE%_amf"
+) else (
+
+    echo 无效的选择，请重新输入
+
+    timeout /t 1 >nul
+    cls
+    goto select_target_encode
+)
+
+:: 用户选择编码配置
+
+:select_encode_profile
+
+echo.
+
+echo 请选择编码配置（当前仅提供常用配置选项）:
+
+echo 1) main（支持：h264 8位，hevc 8位，av1 8位）
+
+echo 2) high（支持：h264 8位，av1 8位（其实10位也支持，但是不常用:( ）
+
+echo 3) high10（仅h264支持，仅新的intel编解码器支持硬件加速，不爱用:( ）
+
+echo 4) main10（仅hevc支持）
+
+echo.
+
+set /p "encode_profile_choice=请输入选项编号 (1-4): "
+
+if "%encode_profile_choice%"=="1" (
+    set "ENCODER_PROFILE=main"
+    set "PIXEL_FORMAT=yuv420p"
+) else if "%encode_profile_choice%"=="2" (
+    set "ENCODER_PROFILE=high"
+    set "PIXEL_FORMAT=yuv420p"
+) else if "%encode_profile_choice%"=="3" (
+    set "ENCODER_PROFILE=high10"
+    set "PIXEL_FORMAT=yuv420p10le"
+) else if "%encode_profile_choice%"=="4" (
+    set "ENCODER_PROFILE=main10"
+    set "PIXEL_FORMAT=p010le"
+) else (
+
+    echo 无效的选择，请重新输入
+
+    timeout /t 1 >nul
+    cls
+    goto select_encode_profile
+)
+
+:: 视频分辨率选择
+
+:resolution_setting
+
+echo.
+
+echo 是否需要转换视频分辨率？
+
+echo [Y] 需要转换分辨率
+
+echo [N] 保持原始分辨率
+
+echo.
+
+set /p "res_choice=请输入选择 (Y/N，默认N): "
+
+if "%res_choice%"=="" set "res_choice=n"
+
+if /i "%res_choice%"=="y" (
+    goto set_resolution
+) else if /i "%res_choice%"=="n" (
+    set "VIDEO_FILTER="
+
+    echo 已选择保持原始分辨率
+
+    timeout /t 1 >nul
+    cls
+    goto resolution_done
+) else (
+
+    echo 无效输入，请重新选择
+
+    timeout /t 1 >nul
+    cls
+    goto resolution_setting
+)
+
+:set_resolution
+
+echo.
+
+echo 请输入目标分辨率（格式：宽度:高度）
+
+echo 示例: 1920:1080, 1280:720, 3840:2160
+
+echo.
+
+set /p "resolution=请输入分辨率: "
+
+set VIDEO_FILTER=-vf "scale=%resolution%"
+
+echo.
+
+echo 目标分辨率设置完成:
+
+echo 目标分辨率: %resolution%
+
+timeout /t 2 >nul
+
+:resolution_done
+
+:: 码率设置
+
+echo.
+
+echo 请设置视频目标码率（单位：k 或 m）
+
+echo 示例: 2500k, 5m
+
+echo.
+
+:: 目标码率设置
+
+set /p "target_bitrate=请输入目标码率（默认2500k）: "
+if "%target_bitrate%"=="" set "target_bitrate=2500k"
+
+:: 最高码率设置
+
+set /p "max_bitrate=请输入最高码率（一般为目标码率的1.5-2倍）（默认5000k）: "
+
+if "%max_bitrate%"=="" set "max_bitrate=5000k"
+
+:: 缓冲区大小设置
+
+set /p "buffer_size=请输入码率波动缓冲区大小（一般为目标码率的2-4倍）（默认10000k）: "
+
+if "%buffer_size%"=="" set "buffer_size=10000k"
+
+:: 设置最终变量
+set "VIDEO_BITRATE=%target_bitrate%"
+set "MAX_BITRATE=%max_bitrate%"
+set "BUFFER_SIZE=%buffer_size%"
+
+echo.
+
+echo 码率设置完成:
+
+echo 目标码率: %VIDEO_BITRATE%
+
+echo 最高码率: %MAX_BITRATE%
+
+echo 缓冲区大小: %BUFFER_SIZE%
+
+timeout /t 2 >nul
+
+:: 音频和字幕流处理参数设置
+
+echo.
+
+echo 请自定义音频流处理参数
+
+echo.
+
+set /p "audio=请输入自定义音频流处理参数（复制音频流请输入 -c:a copy ，不需要请回车跳过）: "
+
+echo.
+
+echo 请自定义字幕流处理参数
+
+echo.
+
+set /p "subtitle=请输入自定义字幕流处理参数（复制字幕流请输入 -c:s copy ，不需要请回车跳过）: "
+
+:: 设置最终变量
+set "AUDIO_CODEC=%audio%"
+set "SUBTITLE_CODEC=%subtitle%"
+
+echo.
+
+echo 处理参数设置完成:
+
+echo 音频流处理参数: %audio%
+
+echo 字幕流处理参数: %subtitle%
+
+timeout /t 2 >nul
+
+:: 设置输入输出目录
+set "INPUT_DIR=input"
+set "OUTPUT_DIR=output"
+
+:: 如果输出目录不存在则创建
+if not exist "%OUTPUT_DIR%" (
+    echo 创建输出目录: %OUTPUT_DIR%
+    mkdir "%OUTPUT_DIR%"
+)
+
+:: 批量处理输入目录中的所有文件
+
+echo.
+
+echo 已经一切就绪了，可以开始批量转码...
+
+echo 输入目录: %INPUT_DIR%
+
+echo 输出目录: %OUTPUT_DIR%
+
+echo 文件处理指令预览：ffmpeg %VIDEO_DECODER% -i input file -map 0 %VIDEO_ENCODER% -profile:v %ENCODER_PROFILE% %VIDEO_FILTER% -b:v %VIDEO_BITRATE% -maxrate %MAX_BITRATE% -bufsize %BUFFER_SIZE% -pix_fmt %PIXEL_FORMAT% %AUDIO_CODEC% %SUBTITLE_CODEC% -map_metadata 0 output file
+
+echo.
+
+:: 询问用户是否开始处理文件
+
+:ready
+
+echo.
+
+echo 是否开始处理文件
+
+echo [Y] 开始吧
+
+echo [N] 算了（此操作将会退出批处理）
+
+echo.
+
+set /p "choice=请输入选择 (Y/N，默认N): "
+
+if "%choice%"=="" set "choice=n"
+
+if /i "%choice%"=="y" (
+    goto start
+
+) else if /i "%choice%"=="n" (
+
+    echo 已取消操作，将会退出批处理
+
+    timeout /t 1 >nul
+    exit
+
+) else (
+
+    echo 无效输入，请重新选择
+
+    timeout /t 1 >nul
+    cls
+    goto ready
+)
+
+:start
+
+:: 计数器
+set /a file_count=0
+set /a success_count=0
+set /a fail_count=0
+
+:: 遍历输入目录中的所有文件
+for %%F in ("%INPUT_DIR%\*.*") do (
+    set "INPUT_FILE=%%F"
+    set "FILE_NAME=%%~nxF"
+    set "OUTPUT_FILE=%OUTPUT_DIR%\!FILE_NAME!"
+    
+    echo 正在处理文件: !FILE_NAME!
+
+    echo 输入文件: !INPUT_FILE!
+
+    echo 输出文件: !OUTPUT_FILE!
+
+    echo
+    
+    ffmpeg ^
+      %VIDEO_DECODER% ^
+      -i "!INPUT_FILE!" ^
+      -map 0 ^
+      %VIDEO_ENCODER% ^
+      -profile:v %ENCODER_PROFILE% ^
+      %VIDEO_FILTER% ^
+      -b:v %VIDEO_BITRATE% ^
+      -maxrate %MAX_BITRATE% ^
+      -bufsize %BUFFER_SIZE% ^
+      -pix_fmt %PIXEL_FORMAT% ^
+      %AUDIO_CODEC% ^
+      %SUBTITLE_CODEC% ^
+      -map_metadata 0 ^
+      "!OUTPUT_FILE!"
+    
+    if !errorlevel! equ 0 (
+        echo 转码成功: !FILE_NAME!
+        set /a success_count+=1
+    ) else (
+        echo 转码失败: !FILE_NAME!
+        set /a fail_count+=1
+    )
+    
+    set /a file_count+=1
+    echo.
+)
+
+:: 显示处理结果
+
+echo.
+
+echo 批量转码完成!
+
+echo 处理文件总数: %file_count%
+
+echo 成功转码文件数: %success_count%
+
+echo 失败转码文件数: %fail_count%
+
+echo.
+
+if %fail_count% gtr 0 (
+    echo 注意: 有 %fail_count% 个文件转码失败，请检查错误信息。
+)
+
+pause
