@@ -2,6 +2,10 @@
 
 这是一个简易的 FFmpeg 批量视频转码脚本，提供多种常用的参数配置，含硬件加速选项。
 
+## 作者在用的 FFmpeg 版本下载链接：
+
+[Windows builds from gyan.dev latest release-full version: 8.0](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z)
+
 ## 注意
 启动前请将input文件夹中的.gitkeep（占位文件）删除
 
