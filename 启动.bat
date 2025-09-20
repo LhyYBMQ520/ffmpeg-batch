@@ -43,40 +43,52 @@ if "%encode_choice%"=="1" (
 
 :: 用户选择解码方式
 
-:select_decode
-
 echo.
 
-echo 请选择解码方式（当前仅提供常用的配置选项）:
+echo 请选择解码方式:
 
 echo 1) cpu软件解码（兼容性最好）
 
-echo 2) NVIDIA显卡硬件解码
+echo 2) NVIDIA显卡硬件解码（CUVID）
 
-echo 3) Intel显卡硬件解码（QSV YES）
+echo 3) Intel显卡硬件解码（QSV）
 
-echo 4) AMD显卡硬件解码（暂未测试）
+echo 4) AMD显卡硬件解码（AMF）（暂未测试）
 
 echo.
 
-set /p "decode_choice=请输入选项编号 (1-4): "
+set /p "decode_choice=请输入选项编号 (1-4，默认1): "
+if "%decode_choice%"=="" set "decode_choice=1"
 
 if "%decode_choice%"=="1" (
     set "VIDEO_DECODER="
+
+    echo 已选择: CPU软件解码
+
 ) else if "%decode_choice%"=="2" (
     set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_cuvid"
+
+    echo 已选择: NVIDIA硬件解码
+
 ) else if "%decode_choice%"=="3" (
     set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_qsv"
+
+    echo 已选择: Intel硬件解码
+
 ) else if "%decode_choice%"=="4" (
     set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_amf"
+
+    echo 已选择: AMD硬件解码
+
 ) else (
 
-    echo 无效的选择，请重新输入
+    echo 无效的选择，使用默认值: CPU软件解码
 
-    timeout /t 1 >nul
-    cls
-    goto select_decode
+    set "decode_choice=1"
+    set "VIDEO_DECODER="
 )
+
+timeout /t 1 >nul
 
 :: 用户选择目标编码
 
@@ -119,11 +131,11 @@ echo 请选择编码方式:
 
 echo 1) CPU软编码（兼容性最好，但速度慢，资源消耗大）
 
-echo 2) NVIDIA显卡硬件编码(NVENC YES)
+echo 2) NVIDIA显卡硬件编码(NVENC)
 
-echo 3) Intel显卡硬件编码
+echo 3) Intel显卡硬件编码（QSV）
 
-echo 4) AMD显卡硬件编码（暂未测试）
+echo 4) AMD显卡硬件编码（AMF）（暂未测试）
 
 echo.
 
@@ -254,6 +266,20 @@ echo.
 
 echo 请设置视频目标码率（单位：k 或 m）
 
+echo.
+
+echo 编码格式      相对码率比例      说明
+
+echo =================================================
+
+echo H.264/AVC     100%%              基准
+
+echo HEVC/H.265    50-60%%            比H.264节省约40-50%%码率
+
+echo AV1           30-40%%            比H.264节省约60-70%%码率
+
+echo.
+
 echo 示例: 2500k, 5m
 
 echo.
@@ -292,35 +318,89 @@ echo 缓冲区大小: %BUFFER_SIZE%
 
 timeout /t 2 >nul
 
-:: 音频和字幕流处理参数设置
+:: 音频流处理参数设置
+:audio_setting
 
 echo.
 
-echo 请自定义音频流处理参数
+echo 请选择音频流处理方式：
+
+echo 1) 复制音频流（默认，-c:a copy）
+
+echo 2) 自定义音频参数
 
 echo.
 
-set /p "audio=请输入自定义音频流处理参数（复制音频流请输入 -c:a copy ，不需要请回车跳过）: "
+set /p "audio_choice=请输入选项 (1-2，默认1): "
+if "%audio_choice%"=="" set "audio_choice=1"
+
+if "%audio_choice%"=="1" (
+    set "AUDIO_CODEC=-c:a copy"
+) else if "%audio_choice%"=="2" (
+
+    echo.
+
+    echo 请输入自定义音频参数（示例：aac 或 libopus -b:a 192k）
+
+    set /p "audio_input=请输入参数: "
+    if not "%audio_input%"=="" (
+        set "AUDIO_CODEC=-c:a %audio_input%"
+    ) else (
+        set "AUDIO_CODEC=-c:a copy"
+    )
+) else (
+
+    echo 无效的选择，使用默认设置
+
+    set "AUDIO_CODEC=-c:a copy"
+    timeout /t 1 >nul
+)
+
+:: 字幕流处理参数设置
+:subtitle_setting
 
 echo.
 
-echo 请自定义字幕流处理参数
+echo 请选择字幕流处理方式：
+
+echo 1) 复制字幕流（默认，-c:s copy）
+
+echo 2) 自定义字幕参数
 
 echo.
 
-set /p "subtitle=请输入自定义字幕流处理参数（复制字幕流请输入 -c:s copy ，不需要请回车跳过）: "
+set /p "subtitle_choice=请输入选项 (1-2，默认1): "
+if "%subtitle_choice%"=="" set "subtitle_choice=1"
 
-:: 设置最终变量
-set "AUDIO_CODEC=%audio%"
-set "SUBTITLE_CODEC=%subtitle%"
+if "%subtitle_choice%"=="1" (
+    set "SUBTITLE_CODEC=-c:s copy"
+) else if "%subtitle_choice%"=="2" (
+
+    echo.
+
+    echo 请输入自定义字幕参数（示例：mov_text 或 srt）
+
+    set /p "subtitle_input=请输入参数: "
+    if not "%subtitle_input%"=="" (
+        set "SUBTITLE_CODEC=-c:s %subtitle_input%"
+    ) else (
+        set "SUBTITLE_CODEC=-c:s copy"
+    )
+) else (
+
+    echo 无效的选择，使用默认设置
+
+    set "SUBTITLE_CODEC=-c:s copy"
+    timeout /t 1 >nul
+)
 
 echo.
 
 echo 处理参数设置完成:
 
-echo 音频流处理参数: %audio%
+echo 音频流处理参数: %AUDIO_CODEC%
 
-echo 字幕流处理参数: %subtitle%
+echo 字幕流处理参数: %SUBTITLE_CODEC%
 
 timeout /t 2 >nul
 
@@ -392,46 +472,58 @@ set /a file_count=0
 set /a success_count=0
 set /a fail_count=0
 
-:: 遍历输入目录中的所有文件
+:: 遍历输入目录中的所有文件，忽略.gitkeep
 for %%F in ("%INPUT_DIR%\*.*") do (
     set "INPUT_FILE=%%F"
     set "FILE_NAME=%%~nxF"
-    set "OUTPUT_FILE=%OUTPUT_DIR%\!FILE_NAME!"
     
-    echo 正在处理文件: !FILE_NAME!
+    :: 检查是否为.gitkeep文件
+    if "!FILE_NAME!"==".gitkeep" (
 
-    echo 输入文件: !INPUT_FILE!
-
-    echo 输出文件: !OUTPUT_FILE!
-
-    echo
-    
-    ffmpeg ^
-      %VIDEO_DECODER% ^
-      -i "!INPUT_FILE!" ^
-      -map 0 ^
-      %VIDEO_ENCODER% ^
-      -profile:v %ENCODER_PROFILE% ^
-      %VIDEO_FILTER% ^
-      -b:v %VIDEO_BITRATE% ^
-      -maxrate %MAX_BITRATE% ^
-      -bufsize %BUFFER_SIZE% ^
-      -pix_fmt %PIXEL_FORMAT% ^
-      %AUDIO_CODEC% ^
-      %SUBTITLE_CODEC% ^
-      -map_metadata 0 ^
-      "!OUTPUT_FILE!"
-    
-    if !errorlevel! equ 0 (
-        echo 转码成功: !FILE_NAME!
-        set /a success_count+=1
+        echo 跳过.gitkeep文件
+        
     ) else (
-        echo 转码失败: !FILE_NAME!
-        set /a fail_count+=1
+        set "OUTPUT_FILE=%OUTPUT_DIR%\!FILE_NAME!"
+        
+        echo 正在处理文件: !FILE_NAME!
+
+        echo 输入文件: !INPUT_FILE!
+
+        echo 输出文件: !OUTPUT_FILE!
+
+        echo
+        
+        ffmpeg ^
+          %VIDEO_DECODER% ^
+          -i "!INPUT_FILE!" ^
+          -map 0 ^
+          %VIDEO_ENCODER% ^
+          -profile:v %ENCODER_PROFILE% ^
+          %VIDEO_FILTER% ^
+          -b:v %VIDEO_BITRATE% ^
+          -maxrate %MAX_BITRATE% ^
+          -bufsize %BUFFER_SIZE% ^
+          -pix_fmt %PIXEL_FORMAT% ^
+          %AUDIO_CODEC% ^
+          %SUBTITLE_CODEC% ^
+          -map_metadata 0 ^
+          "!OUTPUT_FILE!"
+        
+        if !errorlevel! equ 0 (
+
+            echo 转码成功: !FILE_NAME!
+
+            set /a success_count+=1
+        ) else (
+
+            echo 转码失败: !FILE_NAME!
+
+            set /a fail_count+=1
+        )
+        
+        set /a file_count+=1
+        echo.
     )
-    
-    set /a file_count+=1
-    echo.
 )
 
 :: 显示处理结果
