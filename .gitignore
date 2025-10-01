@@ -2,7 +2,7 @@
 
 /input/*
 
-/临时.txt
+/一键清空output文件夹.bat
 
 # 保留 input 文件夹本身（添加空文件夹占位符）
 !/input/.gitkeep
