@@ -1,5 +1,7 @@
 # FFmpeg 脚本 (Windows 批处理版本)
 
+[English](./Docs/readme_en.md) | [中文](./README.md) | [繁体中文](./Docs/readme_tcn.md)
+
 这是一个简易的 FFmpeg 脚本，集成了多种音视频处理功能，支持批量操作，满足了快速处理日常音视频的需求。
 
 
