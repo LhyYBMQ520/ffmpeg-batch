@@ -16,9 +16,10 @@ echo 请选择功能:
 echo 1) 视频转码
 echo 2) MP4转GIF动图
 echo 3) 分离音视频流
+echo 4) OGG转M4A音频
 echo.
 
-set /p "mode_choice=请输入选项编号 (1-3): "
+set /p "mode_choice=请输入选项编号 (1-4): "
 
 if "%mode_choice%"=="1" (
     call batch-files\encode.bat
@@ -26,6 +27,8 @@ if "%mode_choice%"=="1" (
     call batch-files\mp4_to_gif.bat
 ) else if "%mode_choice%"=="3" (
     call batch-files\extract_separate.bat
+) else if "%mode_choice%"=="4" (
+    call batch-files\ogg_to_m4a.bat
 ) else (
     echo 无效的选择，请重新输入
     timeout /t 1 >nul
