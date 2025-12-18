@@ -24,7 +24,7 @@ The new architecture uses **main.bat as the central menu**, which calls five sep
 
 ## 📌 Major Update at 2025-11-19
 
-### ✔️ **The original single large script has been split into six independent functional scripts:**
+### ✔️ **The original single large script has been split into four independent functional scripts:**
 
 | Script File              | Function                                                                                 |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
@@ -32,8 +32,6 @@ The new architecture uses **main.bat as the central menu**, which calls five sep
 | **encode.bat**           | Batch video transcoding (H.264 / HEVC / AV1 with full hardware acceleration support)     |
 | **mp4_to_gif.bat**       | Batch MP4 → GIF converter (resolution & FPS configurable)                                |
 | **extract_separate.bat** | Extract video-only stream + extract all audio tracks with correct codec-based extensions |
-| **mkv_to_mp4.bat**       | Batch MKV → MP4 (lossless copy with automatic subtitle handling)                         |
-| **ogg_to_m4a.bat**       | Batch OGG → M4A (AAC high-quality conversion)                                            |
 
 ### ✔️ Benefits
 
