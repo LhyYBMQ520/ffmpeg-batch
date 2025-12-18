@@ -7,13 +7,24 @@
 This is an enhanced FFmpeg batch-processing toolkit.
 The original all-in-one script has been **split into four modular scripts**, making the structure cleaner, easier to maintain, and more flexible for updates and expansion.
 
-The new architecture uses **main.bat as the central menu**, which calls three separate functional scripts stored inside the `batch-files/` folder.
+The new architecture uses **main.bat as the central menu**, which calls five separate functional scripts stored inside the `batch-files/` folder.
+
+---
+
+## 📌 Major Update at 2025-12-18
+
+### ✔️ **Two new utility scripts have been added:**
+
+| Script File          | Function                                                                        |
+| -------------------- | ------------------------------------------------------------------------------- |
+| **mkv_to_mp4.bat**   | Batch MKV → MP4 (lossless stream copy with automatic subtitle compatibility)    |
+| **ogg_to_m4a.bat**   | Batch OGG → M4A (AAC encoding at 256kbps high-quality audio conversion)         |
 
 ---
 
 ## 📌 Major Update at 2025-11-19
 
-### ✔️ **The original single large script has been split into four independent functional scripts:**
+### ✔️ **The original single large script has been split into six independent functional scripts:**
 
 | Script File              | Function                                                                                 |
 | ------------------------ | ---------------------------------------------------------------------------------------- |
@@ -21,6 +32,8 @@ The new architecture uses **main.bat as the central menu**, which calls three se
 | **encode.bat**           | Batch video transcoding (H.264 / HEVC / AV1 with full hardware acceleration support)     |
 | **mp4_to_gif.bat**       | Batch MP4 → GIF converter (resolution & FPS configurable)                                |
 | **extract_separate.bat** | Extract video-only stream + extract all audio tracks with correct codec-based extensions |
+| **mkv_to_mp4.bat**       | Batch MKV → MP4 (lossless copy with automatic subtitle handling)                         |
+| **ogg_to_m4a.bat**       | Batch OGG → M4A (AAC high-quality conversion)                                            |
 
 ### ✔️ Benefits
 
@@ -28,6 +41,7 @@ The new architecture uses **main.bat as the central menu**, which calls three se
 * **Each function operates independently**
 * **Cleaner menu for better user experience**
 * **Automatic multi-audio detection & correct file extension matching**
+* **New quick format conversions (MKV→MP4, OGG→M4A)**
 * **All scripts batch-process files in the `input/` directory**
 
 ---
@@ -91,7 +105,29 @@ filename-video-only.mp4
 
 ---
 
-### 4️⃣ `main.bat` – Central Control Menu (Rebuilt)
+### 4️⃣ `mkv_to_mp4.bat` – MKV to MP4 Converter (New)
+
+* **Lossless stream copy** (no re-encoding, extremely fast)
+* Automatic subtitle compatibility handling (mov_text format)
+* Multi-level fallback mechanism:
+  * Primary: Full copy with subtitle conversion
+  * Fallback: Skip subtitle conversion
+  * Final: Copy video/audio streams only
+* Adds `faststart` flag for optimized web playback
+* Batch processes input directory, outputs to output directory
+
+---
+
+### 5️⃣ `ogg_to_m4a.bat` – OGG to M4A Converter (New)
+
+* Converts OGG (Vorbis) to M4A (AAC) format
+* AAC encoding at **256kbps high quality** output
+* Compatible with iOS / macOS / iTunes ecosystem
+* Batch processes input directory, outputs to output directory
+
+---
+
+### 6️⃣ `main.bat` – Central Control Menu (Rebuilt)
 
 * Unified entry point
 * Calls encode / mp4_to_gif / extract_separate scripts
@@ -106,10 +142,12 @@ Project/
 │
 ├── main.bat                  # Main menu
 │
-├── batch-files/              # Functional scripts
+├── batch-files/              # 5 Functional scripts
 │   ├── encode.bat            # Video transcoding
 │   ├── mp4_to_gif.bat        # MP4 → GIF
-│   └── extract_separate.bat  # Video/audio extraction
+│   ├── extract_separate.bat  # Video/audio extraction
+│   ├── mkv_to_mp4.bat        # MKV → MP4
+│   └── ogg_to_m4a.bat        # OGG → M4A
 │
 ├── input/                    # Input folder
 │   └── .gitkeep
@@ -139,6 +177,8 @@ Choose an option:
 | 1      | Video transcoding (encode.bat)                           |
 | 2      | MP4 to GIF conversion (mp4_to_gif.bat)                   |
 | 3      | Extract video-only + audio tracks (extract_separate.bat) |
+| 4      | OGG to M4A conversion (ogg_to_m4a.bat)                   |
+| 5      | MKV to MP4 conversion (mkv_to_mp4.bat)                   |
 
 ---
 
