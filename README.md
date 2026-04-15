@@ -2,48 +2,18 @@
 
 [English](./Docs/readme_en.md) | [中文](README.md) | [繁体中文](./Docs/readme_tcn.md)
 
-这是一个强化后的 FFmpeg 批处理工具集，将原本合并在一起的大型脚本 **拆分为 4 个模块化脚本**，结构更清晰、维护更容易，也更便于单独更新每个功能。
-
-新版框架由 **主菜单 main.bat 调起其他三个功能脚本**，并将所有逻辑功能独立存放在 `batch-files/` 文件夹中。
+### 这是一个 FFmpeg 批处理工具集。
 
 ---
 
-## 📌 2025.11.19重要更新
+## ✨ 功能特性总览
 
-### ✔️ **原来的单一大脚本已拆分为四个独立的功能脚本：**
+### 1️⃣ `main.bat` —— 主菜单
+* 提供统一简洁的菜单入口
+* 调用各个子脚本
+* 无多余业务逻辑
 
-| 脚本文件                     | 功能                                           |
-| ------------------------ | -------------------------------------------- |
-| **main.bat**             | 主菜单入口，统一调度所有子脚本                              |
-| **encode.bat**           | 批量视频转码（H.264 / HEVC / AV1，含硬件加速、分辨率、码率等完整配置） |
-| **mp4_to_gif.bat**       | MP4 批量转 GIF（可选分辨率、帧率）                        |
-| **extract_separate.bat** | 分离视频流（无音频） + 提取多音轨，并自动识别音频编码与扩展名             |
-
-### ✔️ 优点
-
-* **结构化、易维护**
-* **每个功能独立，不会互相污染或冲突**
-* **主菜单更简洁，用户更容易理解**
-* **新增多音轨自动编码识别与扩展名匹配**
-* **所有脚本均批量处理 input/ 文件夹**
-
----
-
-## 作者使用的 FFmpeg 版本（推荐）
-
-下载链接：
-
-👉 **Windows FFmpeg Release Full（8.0）**
-[https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z)
-
-下载后解压，将 `bin/` 加入系统 PATH 即可。
-
----
-
-## ✨ 功能特性总览（按新结构整理）
-
-### 1️⃣ `encode.bat` —— 视频转码模块
-
+### 2️⃣ `encode.bat` —— 视频转码/压缩模块
 * 支持：H.264 / HEVC(H.265) / AV1
 * **解码方式**：CPU、NVIDIA CUVID、Intel QSV、AMD AMF
 * **编码方式**：CPU、NVENC、QSV、AMF
@@ -54,74 +24,47 @@
 * 字幕支持：复制、跳过、自定义
 * 自动批处理 input 文件夹
 
----
-
-### 2️⃣ `mp4_to_gif.bat` —— MP4 批量转 GIF
-
-* 可自定义分辨率（建议小尺寸）
+### 3️⃣ `mp4_to_gif.bat` —— MP4 批量转 GIF
+* 可自定义分辨率
 * 可调帧率（10–15 推荐）
 * 批量处理 input 目录
 * 输出为 GIF 文件到 output 目录
 
----
-
-### 3️⃣ `extract_separate.bat` —— 视频/音频分离模块（本次大幅强化）
-
+### 4️⃣ `extract_separate.bat` —— 视频/音频分离模块
 * **提取纯视频流**（不含音频，零损耗复制）
 * **自动检测所有音轨**
-* 自动匹配正确扩展名（m4a/mp3/ogg/flac/dts 等）
+* **新增**：自动匹配正确扩展名（m4a/mp3/ogg/flac/dts 等）
 * 多音轨逐个提取并命名为：
-
-```
-文件名-audio1.m4a
-文件名-audio2.ac3
-...
-```
-
+  ```
+  文件名-audio1.m4a
+  文件名-audio2.ac3
+  ...
+  ```
 * 视频文件输出为：
-
-```
-文件名-video-only.mp4
-```
-
----
-
-### 4️⃣ `main.bat` —— 主菜单控制中心（全新重构）
-
-* 提供统一菜单入口
-* 调用 encode / mp4_to_gif / extract_separate 各子脚本
-* 保持界面清晰、无多余逻辑
+  ```
+  文件名-video-only.mp4
+  ```
 
 ---
 
-## 📁 目录结构
+## 作者使用的 FFmpeg 版本（推荐）
 
-```
-项目目录/
-│
-├── main.bat                  # 主菜单脚本
-│
-├── batch-files/              # 3 个独立功能脚本
-│   ├── encode.bat            # 视频转码
-│   ├── mp4_to_gif.bat        # MP4 转 GIF
-│   └── extract_separate.bat  # 视频/音频分离提取
-│
-├── input/                    # 输入文件夹
-│   └── .gitkeep
-│
-├── output/                   # 视频输出（转码/GIF/视频-only）
-│
-└── audio-out/                # 音频提取输出（由 extract_separate.bat 创建）
-```
+下载链接：
+
+👉 **Windows FFmpeg Release Full（latest release version: 8.1 2026-03-16）**
+[https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z)
+
+下载后解压，将 `bin/` 加入系统 PATH 即可。
 
 ---
 
-## 📘 使用方法（新版简化版）
+## 📘 使用方法
 
 ### 1. 将文件放入 `input/`
 
 支持任意格式（mp4/mkv/mov/flac/mp3/m4a……）
-`.gitkeep` 自动忽略。
+
+`.gitkeep` 文件会自动忽略。
 
 ---
 
@@ -131,7 +74,7 @@
 
 | 选项 | 功能脚本                               |
 | -- | ---------------------------------- |
-| 1  | 批量视频转码（encode.bat）                 |
+| 1  | 批量视频转码/压缩（encode.bat）                 |
 | 2  | MP4 批量转 GIF（mp4_to_gif.bat）        |
 | 3  | 分离视频 + 多音轨提取（extract_separate.bat） |
 
@@ -158,5 +101,3 @@
 2. CPU 软编码兼容性最佳但速度较慢
 3. GIF 文件体积通常较大，选择分辨率与帧率要谨慎
 4. 若需要检测源文件信息，推荐使用 MediaInfo
-
----

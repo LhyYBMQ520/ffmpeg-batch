@@ -1,10 +1,10 @@
 chcp 65001 >nul
 @echo off
-TITLE FFmpeg 视频转码
+TITLE FFmpeg 视频转码/压缩
 setlocal enabledelayedexpansion
 
 echo ==================================================
-echo 视频转码功能
+echo 视频转码/压缩功能
 echo ==================================================
 
 :: 用户选择源文件编码格式
@@ -93,7 +93,7 @@ if "%encoding_method_choice%"=="1" (
 echo.
 echo 请选择编码方式:
 
-echo 1) CPU软编码（兼容性最好，依赖libx264/libx265/libsvtav1等库）
+echo 1) CPU软编码（兼容性最好）
 
 echo 2) NVIDIA显卡硬件编码(NVENC)
 
@@ -120,7 +120,7 @@ if "%target_encode_choice%"=="1" (
     :: Intel QSV硬件编码
     set "VIDEO_ENCODER=-c:v %TARGET_ENCODE%_qsv"
 ) else if "%target_encode_choice%"=="4" (
-    :: AMD AMF硬件编码（需确认FFmpeg已编译支持）
+    :: AMD AMF硬件编码
     set "VIDEO_ENCODER=-c:v %TARGET_ENCODE%_amf"
 ) else (
     echo 无效的选择，请重新输入
@@ -237,22 +237,15 @@ set /p "max_bitrate=请输入最高码率（一般为目标码率的1.5-2倍）�
 
 if "%max_bitrate%"=="" set "max_bitrate=5000k"
 
-:: 缓冲区大小设置
-
-set /p "buffer_size=请输入码率波动缓冲区大小（一般为目标码率的2-4倍）（默认10000k）: "
-
-if "%buffer_size%"=="" set "buffer_size=10000k"
 
 :: 设置最终变量
 set "VIDEO_BITRATE=%target_bitrate%"
 set "MAX_BITRATE=%max_bitrate%"
-set "BUFFER_SIZE=%buffer_size%"
 
 echo.
 echo 码率设置完成:
 echo 目标码率: %VIDEO_BITRATE%
 echo 最高码率: %MAX_BITRATE%
-echo 缓冲区大小: %BUFFER_SIZE%
 timeout /t 2 >nul
 
 :: 音频流处理参数设置
@@ -277,6 +270,7 @@ if "%audio_choice%"=="1" (
 ) else if "%audio_choice%"=="3" (
     echo.
     echo 请输入自定义音频参数（示例：aac 或 libopus -b:a 192k，不输入默认为copy）
+    
     set /p "audio_input=请输入参数: "
     if not "%audio_input%"=="" (
         set "AUDIO_CODEC=-c:a %audio_input%"
@@ -295,9 +289,9 @@ if "%audio_choice%"=="1" (
 echo.
 echo 请选择字幕流处理方式：
 
-echo 1) 复制字幕流（默认，-c:s copy）
+echo 1) 没有字幕流？我要跳过（默认）
 
-echo 2) 没有字幕流？我要跳过（不处理任何字幕）
+echo 2) 复制字幕流（-c:s copy）
 
 echo 3) 自定义字幕参数
 echo.
@@ -305,13 +299,14 @@ set /p "subtitle_choice=请输入选项 (1-3，默认1): "
 if "%subtitle_choice%"=="" set "subtitle_choice=1"
 
 if "%subtitle_choice%"=="1" (
-    set "SUBTITLE_CODEC=-c:s copy"
-) else if "%subtitle_choice%"=="2" (
     set "SUBTITLE_CODEC="
     echo 已选择：跳过所有字幕流
+) else if "%subtitle_choice%"=="2" (
+    set "SUBTITLE_CODEC=-c:s copy"
 ) else if "%subtitle_choice%"=="3" (
     echo.
     echo 请输入自定义字幕参数（示例：mov_text 或 srt，不输入默认为copy）
+    
     set /p "subtitle_input=请输入参数: "
     if not "%subtitle_input%"=="" (
         set "SUBTITLE_CODEC=-c:s %subtitle_input%"
@@ -320,8 +315,8 @@ if "%subtitle_choice%"=="1" (
         echo 未输入参数，默认使用：复制字幕流
     )
 ) else (
-    echo 无效的选择，使用默认设置：复制字幕流
-    set "SUBTITLE_CODEC=-c:s copy"
+    echo 无效的选择，使用默认设置：跳过所有字幕流
+    set "SUBTITLE_CODEC="
     timeout /t 1 >nul
 )
 
@@ -349,7 +344,7 @@ echo 输入目录: %INPUT_DIR%
 
 echo 输出目录: %OUTPUT_DIR%
 
-echo 文件处理指令预览：ffmpeg %VIDEO_DECODER% -i input file -map 0 %VIDEO_ENCODER% -profile:v %ENCODER_PROFILE% %VIDEO_FILTER% -b:v %VIDEO_BITRATE% -maxrate %MAX_BITRATE% -bufsize %BUFFER_SIZE% -pix_fmt %PIXEL_FORMAT% %AUDIO_CODEC% %SUBTITLE_CODEC% -map_metadata 0 output file
+echo 文件处理指令预览：ffmpeg %VIDEO_DECODER% -i input file -map 0 %VIDEO_ENCODER% -profile:v %ENCODER_PROFILE% %VIDEO_FILTER% -b:v %VIDEO_BITRATE% -maxrate %MAX_BITRATE% -pix_fmt %PIXEL_FORMAT% %AUDIO_CODEC% %SUBTITLE_CODEC% -map_metadata 0 output file
 echo.
 
 :: 询问用户是否开始处理文件
@@ -408,7 +403,6 @@ for %%F in ("%INPUT_DIR%\*.*") do (
           %VIDEO_FILTER% ^
           -b:v %VIDEO_BITRATE% ^
           -maxrate %MAX_BITRATE% ^
-          -bufsize %BUFFER_SIZE% ^
           -pix_fmt %PIXEL_FORMAT% ^
           %AUDIO_CODEC% ^
           %SUBTITLE_CODEC% ^

@@ -13,7 +13,7 @@ cd /d "%~dp0"
 :main_menu
 echo.
 echo 请选择功能:
-echo 1) 视频转码
+echo 1) 视频转码/压缩
 echo 2) MP4转GIF动图
 echo 3) 分离音视频流
 echo.
