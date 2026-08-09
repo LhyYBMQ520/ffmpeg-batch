@@ -7,28 +7,8 @@ echo ==================================================
 echo 视频转码/压缩功能
 echo ==================================================
 
-:: 用户选择源文件编码格式
-:select_encode
 echo.
-echo 请选择源文件的编码格式（推荐使用MediaInfo工具获取源文件详细信息）:
-echo 1) H.264
-echo 2) HEVC/H.265
-echo 3) AV1
-echo.
-set /p "encode_choice=请输入选项编号 (1-3): "
-
-if "%encode_choice%"=="1" (
-    set "SOURCE_ENCODE=h264"
-) else if "%encode_choice%"=="2" (
-    set "SOURCE_ENCODE=hevc"
-) else if "%encode_choice%"=="3" (
-    set "SOURCE_ENCODE=av1"
-) else (
-    echo 无效的选择，请重新输入
-    timeout /t 1 >nul
-    cls
-    goto select_encode
-)
+echo 源视频编码将由 FFprobe 自动检测（支持混合 H.264、HEVC、AV1 输入）。
 
 :: 用户选择解码方式
 echo.
@@ -40,27 +20,27 @@ echo 2) NVIDIA显卡硬件解码（CUVID）
 
 echo 3) Intel显卡硬件解码（QSV）
 
-echo 4) AMD显卡硬件解码（AMF）（暂未测试）
+echo 4) AMD显卡硬件解码（AMF）
 echo.
 set /p "decode_choice=请输入选项编号 (1-4，默认1): "
 if "%decode_choice%"=="" set "decode_choice=1"
 
 if "%decode_choice%"=="1" (
-    set "VIDEO_DECODER="
+    set "DECODER_MODE=cpu"
     echo 已选择: CPU软件解码
 ) else if "%decode_choice%"=="2" (
-    set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_cuvid"
+    set "DECODER_MODE=cuvid"
     echo 已选择: NVIDIA硬件解码
 ) else if "%decode_choice%"=="3" (
-    set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_qsv"
+    set "DECODER_MODE=qsv"
     echo 已选择: Intel硬件解码
 ) else if "%decode_choice%"=="4" (
-    set "VIDEO_DECODER=-c:v %SOURCE_ENCODE%_amf"
+    set "DECODER_MODE=amf"
     echo 已选择: AMD硬件解码
 ) else (
     echo 无效的选择，使用默认值: CPU软件解码
     set "decode_choice=1"
-    set "VIDEO_DECODER="
+    set "DECODER_MODE=cpu"
 )
 
 timeout /t 1 >nul
@@ -70,7 +50,9 @@ timeout /t 1 >nul
 echo.
 echo 请选择目标编码
 echo 1) H.264
+
 echo 2) HEVC/H.265
+
 echo 3) AV1
 echo.
 set /p "encoding_method_choice=请输入选项编号 (1-3): "
@@ -99,7 +81,7 @@ echo 2) NVIDIA显卡硬件编码(NVENC)
 
 echo 3) Intel显卡硬件编码（QSV）
 
-echo 4) AMD显卡硬件编码（AMF）（暂未测试）
+echo 4) AMD显卡硬件编码（AMF）
 echo.
 set /p "target_encode_choice=请输入选项编号 (1-4): "
 
@@ -136,6 +118,14 @@ echo.
 
 :: 用户选择编码配置
 :select_encode_profile
+if /i "%TARGET_ENCODE%"=="av1" (
+    set "ENCODER_PROFILE=main"
+    set "PIXEL_FORMAT=yuv420p"
+    set "PROFILE_ARG="
+    echo AV1自动使用main配置，跳过profile参数设置。
+    goto profile_done
+)
+
 echo.
 echo 请选择编码配置（当前仅提供常用配置选项）:
 
@@ -167,6 +157,54 @@ if "%encode_profile_choice%"=="1" (
     cls
     goto select_encode_profile
 )
+
+set "PROFILE_ARG=-profile:v %ENCODER_PROFILE%"
+
+:profile_done
+
+:: 用户选择目标容器
+:select_container
+echo.
+echo 请选择目标容器:
+
+echo 1) MKV（兼容性最好，默认）
+
+echo 2) MP4（适合 H.264/HEVC、AAC）
+
+echo 3) WebM（适合 AV1、Opus）
+
+echo.
+set /p "container_choice=请输入选项编号 (1-3，默认1): "
+if "%container_choice%"=="" set "container_choice=1"
+
+if "%container_choice%"=="1" (
+    set "TARGET_CONTAINER=mkv"
+    set "OUTPUT_EXT=.mkv"
+    set "OUTPUT_FORMAT=matroska"
+) else if "%container_choice%"=="2" (
+    set "TARGET_CONTAINER=mp4"
+    set "OUTPUT_EXT=.mp4"
+    set "OUTPUT_FORMAT=mp4"
+) else if "%container_choice%"=="3" (
+    set "TARGET_CONTAINER=webm"
+    set "OUTPUT_EXT=.webm"
+    set "OUTPUT_FORMAT=webm"
+) else (
+    echo 无效的选择，请重新输入
+    timeout /t 1 >nul
+    cls
+    goto select_container
+)
+
+if /i "%TARGET_CONTAINER%"=="webm" if /i not "%TARGET_ENCODE%"=="av1" (
+    echo WebM容器仅支持当前列表中的AV1目标编码，请重新选择容器
+    timeout /t 2 >nul
+    cls
+    goto select_container
+)
+
+echo 已选择目标容器: %TARGET_CONTAINER%
+timeout /t 1 >nul
 
 :: 视频分辨率选择
 :resolution_setting
@@ -204,7 +242,7 @@ set /p "resolution=请输入分辨率: "
 set VIDEO_FILTER=-vf "scale=%resolution%"
 echo.
 echo 目标分辨率设置完成: %resolution%
-timeout /t 2 >nul
+timeout /t 1 >nul
 
 :resolution_done
 :: 码率设置
@@ -242,18 +280,38 @@ if "%max_bitrate%"=="" set "max_bitrate=5000k"
 set "VIDEO_BITRATE=%target_bitrate%"
 set "MAX_BITRATE=%max_bitrate%"
 
+:: 根据最高码率自动计算两倍大小的缓冲区
+set "MAX_BITRATE_NUMBER=%max_bitrate%"
+set "MAX_BITRATE_UNIT="
+if /i "%max_bitrate:~-1%"=="k" (
+    set "MAX_BITRATE_NUMBER=%max_bitrate:~0,-1%"
+    set "MAX_BITRATE_UNIT=k"
+) else if /i "%max_bitrate:~-1%"=="m" (
+    set "MAX_BITRATE_NUMBER=%max_bitrate:~0,-1%"
+    set "MAX_BITRATE_UNIT=m"
+)
+set /a BUF_SIZE_NUMBER=MAX_BITRATE_NUMBER*2
+if defined MAX_BITRATE_UNIT (
+    set "BUF_SIZE=%BUF_SIZE_NUMBER%%MAX_BITRATE_UNIT%"
+) else (
+    set "BUF_SIZE=%BUF_SIZE_NUMBER%"
+)
+
 echo.
 echo 码率设置完成:
 echo 目标码率: %VIDEO_BITRATE%
 echo 最高码率: %MAX_BITRATE%
-timeout /t 2 >nul
+echo 缓冲区大小: %BUF_SIZE%
+timeout /t 1 >nul
 
 :: 音频流处理参数设置
 :audio_setting
+set "AUDIO_COPY_LABEL=复制音频流（默认，-c:a copy）"
+if /i "%TARGET_CONTAINER%"=="webm" set "AUDIO_COPY_LABEL=复制音频流（WebM将自动转为Opus，-c:a libopus）"
 echo.
 echo 请选择音频流处理方式：
 
-echo 1) 复制音频流（默认，-c:a copy）
+echo 1) %AUDIO_COPY_LABEL%
 
 echo 2) 忽略音频轨（不保留音频）
 
@@ -263,8 +321,10 @@ set /p "audio_choice=请输入选项 (1-3，默认1): "
 if "%audio_choice%"=="" set "audio_choice=1"
 
 if "%audio_choice%"=="1" (
+    set "AUDIO_MAP=-map 0:a?"
     set "AUDIO_CODEC=-c:a copy"
 ) else if "%audio_choice%"=="2" (
+    set "AUDIO_MAP="
     set "AUDIO_CODEC=-an"
     echo 已选择：忽略所有音频轨
 ) else if "%audio_choice%"=="3" (
@@ -273,25 +333,31 @@ if "%audio_choice%"=="1" (
     
     set /p "audio_input=请输入参数: "
     if not "%audio_input%"=="" (
+        set "AUDIO_MAP=-map 0:a?"
         set "AUDIO_CODEC=-c:a %audio_input%"
     ) else (
+        set "AUDIO_MAP=-map 0:a?"
         set "AUDIO_CODEC=-c:a copy"
         echo 未输入参数，默认使用：复制音频流
     )
 ) else (
     echo 无效的选择，使用默认设置：复制音频流
+    set "AUDIO_MAP=-map 0:a?"
     set "AUDIO_CODEC=-c:a copy"
     timeout /t 1 >nul
 )
 
 :: 字幕流处理参数设置
 :subtitle_setting
+set "SUBTITLE_COPY_LABEL=复制字幕流（-c:s copy）"
+if /i "%TARGET_CONTAINER%"=="mp4" set "SUBTITLE_COPY_LABEL=复制字幕流（MP4将自动转为mov_text，-c:s mov_text）"
+if /i "%TARGET_CONTAINER%"=="webm" set "SUBTITLE_COPY_LABEL=复制字幕流（WebM将自动转为WebVTT，-c:s webvtt）"
 echo.
 echo 请选择字幕流处理方式：
 
 echo 1) 没有字幕流？我要跳过（默认）
 
-echo 2) 复制字幕流（-c:s copy）
+echo 2) %SUBTITLE_COPY_LABEL%
 
 echo 3) 自定义字幕参数
 echo.
@@ -299,9 +365,11 @@ set /p "subtitle_choice=请输入选项 (1-3，默认1): "
 if "%subtitle_choice%"=="" set "subtitle_choice=1"
 
 if "%subtitle_choice%"=="1" (
-    set "SUBTITLE_CODEC="
+    set "SUBTITLE_MAP="
+    set "SUBTITLE_CODEC=-sn"
     echo 已选择：跳过所有字幕流
 ) else if "%subtitle_choice%"=="2" (
+    set "SUBTITLE_MAP=-map 0:s?"
     set "SUBTITLE_CODEC=-c:s copy"
 ) else if "%subtitle_choice%"=="3" (
     echo.
@@ -309,21 +377,77 @@ if "%subtitle_choice%"=="1" (
     
     set /p "subtitle_input=请输入参数: "
     if not "%subtitle_input%"=="" (
+        set "SUBTITLE_MAP=-map 0:s?"
         set "SUBTITLE_CODEC=-c:s %subtitle_input%"
     ) else (
+        set "SUBTITLE_MAP=-map 0:s?"
         set "SUBTITLE_CODEC=-c:s copy"
         echo 未输入参数，默认使用：复制字幕流
     )
 ) else (
     echo 无效的选择，使用默认设置：跳过所有字幕流
-    set "SUBTITLE_CODEC="
+    set "subtitle_choice=1"
+    set "SUBTITLE_MAP="
+    set "SUBTITLE_CODEC=-sn"
     timeout /t 1 >nul
+)
+
+if "%subtitle_choice%"=="1" (
+    set "ATTACHMENT_CHOICE=2"
+    set "ATTACHMENT_ARGS="
+    goto attachment_done
+)
+
+:attachment_setting
+echo.
+echo 是否复制字体附件？（ASS字幕通常需要字体附件）
+echo 1) 复制字体附件（默认）
+
+echo 2) 不复制字体附件
+echo.
+set /p "attachment_choice=请输入选项 (1-2，默认1): "
+if "%attachment_choice%"=="" set "attachment_choice=1"
+
+if "%attachment_choice%"=="1" (
+    set "ATTACHMENT_CHOICE=1"
+    set "ATTACHMENT_ARGS=-map 0:t? -c:t copy"
+    echo 已选择：复制字体附件（仅对MKV输出生效）
+) else if "%attachment_choice%"=="2" (
+    set "ATTACHMENT_CHOICE=2"
+    set "ATTACHMENT_ARGS="
+    echo 已选择：不复制字体附件
+) else (
+    echo 无效输入，请重新选择
+    timeout /t 1 >nul
+    goto attachment_setting
+)
+
+:attachment_done
+
+:: 按目标容器调整不兼容的流编码
+if /i "%TARGET_CONTAINER%"=="mp4" (
+    if not "%subtitle_choice%"=="1" set "SUBTITLE_CODEC=-c:s mov_text"
+    set "ATTACHMENT_CHOICE=2"
+    set "ATTACHMENT_ARGS="
+    echo.
+    echo 提示：MP4不支持ASS字幕和字体附件，字幕将转换为mov_text，字体附件不复制。
+)
+if /i "%TARGET_CONTAINER%"=="webm" (
+    if "%audio_choice%"=="1" set "AUDIO_CODEC=-c:a libopus"
+    if not "%subtitle_choice%"=="1" set "SUBTITLE_CODEC=-c:s webvtt"
+    set "ATTACHMENT_CHOICE=2"
+    set "ATTACHMENT_ARGS="
+    echo.
+    echo 提示：WebM将使用Opus音频和WebVTT字幕，字体附件不复制。
 )
 
 echo.
 echo 处理参数设置完成:
+echo.
 echo 音频流处理参数: %AUDIO_CODEC%
 echo 字幕流处理参数: %SUBTITLE_CODEC%
+if "%ATTACHMENT_CHOICE%"=="1" (echo 字体附件: MKV输出时复制) else (echo 字体附件: 不复制)
+echo.
 timeout /t 2 >nul
 
 :: 设置输入输出目录
@@ -344,7 +468,9 @@ echo 输入目录: %INPUT_DIR%
 
 echo 输出目录: %OUTPUT_DIR%
 
-echo 文件处理指令预览：ffmpeg %VIDEO_DECODER% -i input file -map 0 %VIDEO_ENCODER% -profile:v %ENCODER_PROFILE% %VIDEO_FILTER% -b:v %VIDEO_BITRATE% -maxrate %MAX_BITRATE% -pix_fmt %PIXEL_FORMAT% %AUDIO_CODEC% %SUBTITLE_CODEC% -map_metadata 0 output file
+echo 目标容器: %TARGET_CONTAINER%（输出扩展名: %OUTPUT_EXT%）
+
+echo 文件处理指令预览：ffmpeg [按文件自动选择解码器] -i input file -map 0:V:0? %AUDIO_MAP% %SUBTITLE_MAP% %ATTACHMENT_ARGS% %VIDEO_ENCODER% %PROFILE_ARG% %VIDEO_FILTER% -b:v %VIDEO_BITRATE% -maxrate %MAX_BITRATE% -bufsize %BUF_SIZE% -pix_fmt %PIXEL_FORMAT% %AUDIO_CODEC% %SUBTITLE_CODEC% -map_metadata 0 -metadata:s:v BPS= -metadata:s:v DURATION= -metadata:s:v NUMBER_OF_BYTES= -metadata:s:v NUMBER_OF_FRAMES= -metadata:s:v _STATISTICS_TAGS= -metadata:s:v _STATISTICS_WRITING_APP= -metadata:s:v _STATISTICS_WRITING_DATE_UTC= output file
 echo.
 
 :: 询问用户是否开始处理文件
@@ -387,40 +513,101 @@ for %%F in ("%INPUT_DIR%\*.*") do (
     if "!FILE_NAME!"==".gitkeep" (
         echo 跳过.gitkeep文件
     ) else (
-        set "OUTPUT_FILE=%OUTPUT_DIR%\!FILE_NAME!"
+        set "OUTPUT_FILE=%OUTPUT_DIR%\%%~nF!OUTPUT_EXT!"
+        set "ATTACHMENT_ARGS="
+        if /i "!TARGET_CONTAINER!"=="mkv" if "!ATTACHMENT_CHOICE!"=="1" set "ATTACHMENT_ARGS=-map 0:t? -c:t copy"
         
         echo 正在处理文件: !FILE_NAME!
         echo 输入文件: !INPUT_FILE!
         echo 输出文件: !OUTPUT_FILE!
-        echo
-        
-        ffmpeg ^
-          %VIDEO_DECODER% ^
-          -i "!INPUT_FILE!" ^
-          -map 0 ^
-          %VIDEO_ENCODER% ^
-          -profile:v %ENCODER_PROFILE% ^
-          %VIDEO_FILTER% ^
-          -b:v %VIDEO_BITRATE% ^
-          -maxrate %MAX_BITRATE% ^
-          -pix_fmt %PIXEL_FORMAT% ^
-          %AUDIO_CODEC% ^
-          %SUBTITLE_CODEC% ^
-          -map_metadata 0 ^
-          "!OUTPUT_FILE!"
-        
-        if !errorlevel! equ 0 (
-            echo 转码成功: !FILE_NAME!
-            set /a success_count+=1
-        ) else (
-            echo 转码失败: !FILE_NAME!
+        echo.
+
+        set "SOURCE_ENCODE="
+        ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "!INPUT_FILE!" > video_codec.tmp
+
+        if errorlevel 1 (
+            echo 视频编码检测失败，跳过文件: !FILE_NAME!
             set /a fail_count+=1
+        ) else (
+            set /p "SOURCE_ENCODE="<video_codec.tmp
+
+            if not defined SOURCE_ENCODE (
+                echo 未检测到视频流，跳过文件: !FILE_NAME!
+                set /a fail_count+=1
+            ) else (
+                set "VIDEO_DECODER="
+
+                if "!DECODER_MODE!"=="cuvid" (
+                    if /i "!SOURCE_ENCODE!"=="h264" set "VIDEO_DECODER=-c:v h264_cuvid"
+                    if /i "!SOURCE_ENCODE!"=="hevc" set "VIDEO_DECODER=-c:v hevc_cuvid"
+                    if /i "!SOURCE_ENCODE!"=="av1" set "VIDEO_DECODER=-c:v av1_cuvid"
+                )
+                if "!DECODER_MODE!"=="qsv" (
+                    if /i "!SOURCE_ENCODE!"=="h264" set "VIDEO_DECODER=-c:v h264_qsv"
+                    if /i "!SOURCE_ENCODE!"=="hevc" set "VIDEO_DECODER=-c:v hevc_qsv"
+                    if /i "!SOURCE_ENCODE!"=="av1" set "VIDEO_DECODER=-c:v av1_qsv"
+                )
+                if "!DECODER_MODE!"=="amf" (
+                    if /i "!SOURCE_ENCODE!"=="h264" set "VIDEO_DECODER=-c:v h264_amf"
+                    if /i "!SOURCE_ENCODE!"=="hevc" set "VIDEO_DECODER=-c:v hevc_amf"
+                    if /i "!SOURCE_ENCODE!"=="av1" set "VIDEO_DECODER=-c:v av1_amf"
+                )
+
+                echo 检测到源视频编码: !SOURCE_ENCODE!
+                timeout /t 2 >nul
+
+                set "DECODER_READY="
+                if "!DECODER_MODE!"=="cpu" set "DECODER_READY=1"
+                if defined VIDEO_DECODER set "DECODER_READY=1"
+
+                if not defined DECODER_READY (
+                    echo 所选硬件解码方式不支持该编码，跳过文件: !FILE_NAME!
+                    set /a fail_count+=1
+                ) else (
+                    ffmpeg ^
+                      !VIDEO_DECODER! ^
+                      -i "!INPUT_FILE!" ^
+                      -map 0:V:0? ^
+                      %AUDIO_MAP% ^
+                      %SUBTITLE_MAP% ^
+                      !ATTACHMENT_ARGS! ^
+                      %VIDEO_ENCODER% ^
+                      %PROFILE_ARG% ^
+                      %VIDEO_FILTER% ^
+                      -b:v %VIDEO_BITRATE% ^
+                      -maxrate %MAX_BITRATE% ^
+                      -bufsize %BUF_SIZE% ^
+                      -pix_fmt %PIXEL_FORMAT% ^
+                      %AUDIO_CODEC% ^
+                      %SUBTITLE_CODEC% ^
+                      -map_metadata 0 ^
+                      -metadata:s:v BPS= ^
+                      -metadata:s:v DURATION= ^
+                      -metadata:s:v NUMBER_OF_BYTES= ^
+                      -metadata:s:v NUMBER_OF_FRAMES= ^
+                      -metadata:s:v _STATISTICS_TAGS= ^
+                      -metadata:s:v _STATISTICS_WRITING_APP= ^
+                      -metadata:s:v _STATISTICS_WRITING_DATE_UTC= ^
+                      -f %OUTPUT_FORMAT% ^
+                      "!OUTPUT_FILE!"
+
+                    if !errorlevel! equ 0 (
+                        echo 转码成功: !FILE_NAME!
+                        set /a success_count+=1
+                    ) else (
+                        echo 转码失败: !FILE_NAME!
+                        set /a fail_count+=1
+                    )
+                )
+            )
         )
         
         set /a file_count+=1
         echo.
     )
 )
+
+del video_codec.tmp 2>nul
 
 :: 显示处理结果
 echo.

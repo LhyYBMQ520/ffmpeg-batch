@@ -32,7 +32,7 @@ if "%res_choice%"=="" set "res_choice=n"
 if /i "%res_choice%"=="y" (
     goto gif_set_resolution
 ) else if /i "%res_choice%"=="n" (
-    set "GIF_SCALE="
+    set "GIF_SCALE_FILTER="
     echo 已选择保持原始分辨率
     timeout /t 1 >nul
     goto gif_resolution_done
@@ -50,7 +50,7 @@ echo 请输入目标分辨率（格式：宽度:高度）
 echo 示例: 360x360, 640x480, 800x600（GIF建议较小分辨率）
 echo.
 set /p "resolution=请输入分辨率: "
-set "GIF_SCALE=-s %resolution%"
+set "GIF_SCALE_FILTER=scale=!resolution:x=:!:flags=lanczos,"
 echo.
 echo 目标分辨率设置完成: %resolution%
 timeout /t 2 >nul
@@ -71,7 +71,7 @@ if "%fps_choice%"=="" set "fps_choice=n"
 if /i "%fps_choice%"=="y" (
     goto gif_set_frame_rate
 ) else if /i "%fps_choice%"=="n" (
-    set "GIF_FPS="
+    set "GIF_FPS_FILTER="
     echo 已选择保持原始帧率
     timeout /t 1 >nul
     goto gif_frame_rate_done
@@ -87,7 +87,7 @@ echo.
 echo 请输入目标帧率（示例：10, 15, 20，GIF建议10-15）
 echo.
 set /p "fps=请输入帧率: "
-set "GIF_FPS=-r %fps%"
+set "GIF_FPS_FILTER=fps=!fps!,"
 echo.
 echo 目标帧率设置完成: %fps%
 timeout /t 2 >nul
@@ -96,11 +96,11 @@ timeout /t 2 >nul
 :: 显示设置信息
 echo.
 echo 转换参数设置完成:
-if defined GIF_SCALE (echo 分辨率设置: %GIF_SCALE%) else (echo 分辨率设置: 保持原始)
-if defined GIF_FPS (echo 帧率设置: %GIF_FPS%) else (echo 帧率设置: 保持原始)
+if defined GIF_SCALE_FILTER (echo 分辨率设置: %resolution%) else (echo 分辨率设置: 保持原始)
+if defined GIF_FPS_FILTER (echo 帧率设置: %fps%) else (echo 帧率设置: 保持原始)
 echo 输入目录: %INPUT_DIR%
 echo 输出目录: %OUTPUT_DIR%
-echo 转换指令预览: ffmpeg -i input.mp4 %GIF_SCALE% %GIF_FPS% output.gif
+echo 转换指令预览: ffmpeg -i input.mp4 -filter_complex "[0:v]fps/scale,split,palettegen/paletteuse" -map "[gif]" -an -loop 0 output.gif
 echo.
 
 :: 询问是否开始转换
@@ -150,8 +150,13 @@ for %%F in ("%INPUT_DIR%\*.*") do (
         echo 输出文件: !OUTPUT_FILE!
         echo.
         
-        :: 执行GIF转换命令
-        ffmpeg -i "!INPUT_FILE!" %GIF_SCALE% %GIF_FPS% "!OUTPUT_FILE!"
+        :: 使用单次调色板流程，提高 GIF 的颜色质量。
+        ffmpeg -i "!INPUT_FILE!" ^
+            -filter_complex "[0:v]!GIF_FPS_FILTER!!GIF_SCALE_FILTER!split[v0][v1];[v0]palettegen=stats_mode=diff[p];[v1][p]paletteuse=dither=sierra2_4a[gif]" ^
+            -map "[gif]" ^
+            -an ^
+            -loop 0 ^
+            "!OUTPUT_FILE!"
         
         :: 检查执行结果
         if !errorlevel! equ 0 (

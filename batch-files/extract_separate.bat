@@ -63,38 +63,137 @@ for %%F in ("%INPUT_DIR%\*.*") do (
         echo 视频输出：!v_out!
         echo.
 
-        ffmpeg -y -hide_banner -i "!file!" -c:v copy -an "!v_out!"
+        ffmpeg -y -hide_banner -i "!file!" -map 0:v:0? -c:v copy -an -sn -dn "!v_out!"
         if !errorlevel! equ 0 (set /a v_ok+=1 & echo 视频提取成功) else (set /a v_err+=1 & echo 视频提取失败)
 
-        :: 2. 提取音频流（使用临时 log）
-        ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "!file!" > audio.tmp 2>&1
+        :: 2. 探测并提取音频流
+        ffprobe -v error -select_streams a -show_entries stream=codec_name -of csv=p=0 "!file!" > audio.tmp
 
-        echo.
-        echo audio.tmp 内容：
+        if errorlevel 1 (
+            echo.
+            echo 音频流检测失败，跳过音频提取：!fullname!
+            set /a a_err+=1
 
-        type audio.tmp
+        ) else (
 
-        echo 以上为 audio.tmp 内容
-        echo.
+            echo.
+            echo audio.tmp 内容：
 
-        :: 遍历每一行，每条音轨
-        set /a track_index=0
-        for /f "usebackq tokens=*" %%a in ("audio.tmp") do (
+            type audio.tmp
+
+            echo 以上为 audio.tmp 内容
+            echo.
+
+            :: 遍历每一行，每条音轨
+            set /a track_index=0
+            for /f "usebackq tokens=*" %%a in ("audio.tmp") do (
             set /a track_index+=1
             set "a_codec=%%a"
 
-            :: 根据编码选择后缀
-            set "a_ext=!a_codec!"
-            if /i "!a_codec!"=="aac" set "a_ext=m4a"
-            if /i "!a_codec!"=="mp3" set "a_ext=mp3"
-            if /i "!a_codec!"=="opus" set "a_ext=ogg"
-            if /i "!a_codec!"=="flac" set "a_ext=flac"
-            if /i "!a_codec!"=="wav" set "a_ext=wav"
-            if /i "!a_codec!"=="ac3" set "a_ext=ac3"
-            if /i "!a_codec!"=="eac3" set "a_ext=eac3"
-            if /i "!a_codec!"=="vorbis" set "a_ext=ogg"
-            if /i "!a_codec!"=="dts" set "a_ext=dts"
-            if /i "!a_codec!"=="mp2" set "a_ext=mp2"
+            :: 根据编码选择扩展名和输出 muxer；未知编码回退到 Matroska 音频容器。
+            set "a_ext=mka"
+            set "a_muxer=-f matroska"
+
+            if /i "!a_codec!"=="aac" (
+                set "a_ext=m4a"
+                set "a_muxer=-f ipod"
+            )
+            if /i "!a_codec!"=="alac" (
+                set "a_ext=m4a"
+                set "a_muxer=-f ipod"
+            )
+            if /i "!a_codec!"=="mp3" (
+                set "a_ext=mp3"
+                set "a_muxer=-f mp3"
+            )
+            if /i "!a_codec!"=="mp2" (
+                set "a_ext=mp2"
+                set "a_muxer=-f mp2"
+            )
+            if /i "!a_codec!"=="opus" (
+                set "a_ext=opus"
+                set "a_muxer=-f opus"
+            )
+            if /i "!a_codec!"=="vorbis" (
+                set "a_ext=ogg"
+                set "a_muxer=-f ogg"
+            )
+            if /i "!a_codec!"=="speex" (
+                set "a_ext=ogg"
+                set "a_muxer=-f ogg"
+            )
+            if /i "!a_codec!"=="flac" (
+                set "a_ext=flac"
+                set "a_muxer=-f flac"
+            )
+            if /i "!a_codec!"=="ac3" (
+                set "a_ext=ac3"
+                set "a_muxer=-f ac3"
+            )
+            if /i "!a_codec!"=="eac3" (
+                set "a_ext=eac3"
+                set "a_muxer=-f eac3"
+            )
+            if /i "!a_codec!"=="dts" (
+                set "a_ext=dts"
+                set "a_muxer=-f dts"
+            )
+            if /i "!a_codec!"=="truehd" (
+                set "a_ext=thd"
+                set "a_muxer=-f truehd"
+            )
+            if /i "!a_codec!"=="mlp" (
+                set "a_ext=mlp"
+                set "a_muxer=-f mlp"
+            )
+            if /i "!a_codec!"=="amr_nb" (
+                set "a_ext=amr"
+                set "a_muxer=-f amr"
+            )
+            if /i "!a_codec!"=="g722" (
+                set "a_ext=g722"
+                set "a_muxer=-f g722"
+            )
+            if /i "!a_codec!"=="adpcm_g722" (
+                set "a_ext=g722"
+                set "a_muxer=-f g722"
+            )
+            if /i "!a_codec!"=="wavpack" (
+                set "a_ext=wv"
+                set "a_muxer=-f wv"
+            )
+            if /i "!a_codec!"=="wmav1" (
+                set "a_ext=wma"
+                set "a_muxer=-f asf"
+            )
+            if /i "!a_codec!"=="wmav2" (
+                set "a_ext=wma"
+                set "a_muxer=-f asf"
+            )
+            if /i "!a_codec!"=="wmapro" (
+                set "a_ext=wma"
+                set "a_muxer=-f asf"
+            )
+            if /i "!a_codec!"=="wmalossless" (
+                set "a_ext=wma"
+                set "a_muxer=-f asf"
+            )
+
+            :: WAV 支持这些常见的小端 PCM 与 G.711 格式。
+            for %%p in (pcm_s8 pcm_u8 pcm_s16le pcm_u16le pcm_s24le pcm_u24le pcm_s32le pcm_u32le pcm_f32le pcm_f64le pcm_alaw pcm_mulaw) do (
+                if /i "!a_codec!"=="%%p" (
+                    set "a_ext=wav"
+                    set "a_muxer=-f wav"
+                )
+            )
+
+            :: 大端 PCM 使用 AIFF；其余 pcm_* 与 adpcm_* 保持 MKA 回退。
+            for %%p in (pcm_s16be pcm_s24be pcm_s32be pcm_f32be pcm_f64be) do (
+                if /i "!a_codec!"=="%%p" (
+                    set "a_ext=aiff"
+                    set "a_muxer=-f aiff"
+                )
+            )
 
             :: 输出文件名加轨道编号
             set "a_out=%OUTPUT_AUDIO_DIR%\!name!-audio!track_index!.!a_ext!"
@@ -104,15 +203,17 @@ for %%F in ("%INPUT_DIR%\*.*") do (
 
             echo 提取音轨 !track_index! 编码：!a_codec!
             echo 输出文件：!a_out!
+            timeout /t 2 >nul
 
             :: 提取对应音轨
-            ffmpeg -y -hide_banner -i "!file!" -map 0:a:!ff_index! -c:a copy -vn "!a_out!"
+            ffmpeg -y -hide_banner -i "!file!" -map 0:a:!ff_index! -c:a copy -vn !a_muxer! "!a_out!"
             if !errorlevel! equ 0 (
                 set /a a_ok+=1
                 echo 音轨 !track_index! 提取成功
             ) else (
                 set /a a_err+=1
                 echo 音轨 !track_index! 提取失败
+            )
             )
         )
     )

@@ -1,103 +1,99 @@
 # FFmpeg 脚本工具集（Windows 批处理版）
 
-[English](./Docs/readme_en.md) | [中文](README.md) | [繁体中文](./Docs/readme_tcn.md)
+这是一个基于 FFmpeg 的 Windows 批处理工具集，提供视频转码、MP4 转 GIF、视频音频分离三项功能。
 
-### 这是一个 FFmpeg 批处理工具集。
+## 功能总览
 
----
+### 1. 视频转码/压缩
 
-## ✨ 功能特性总览
+脚本：`batch-files/encode.bat`
 
-### 1️⃣ `main.bat` —— 主菜单
-* 提供统一简洁的菜单入口
-* 调用各个子脚本
-* 无多余业务逻辑
+- 使用 FFprobe 自动检测源视频编码，不再手动选择 H.264、HEVC 或 AV1 输入格式。
+- 支持 CPU、NVIDIA CUVID、Intel QSV、AMD AMF 解码。
+- 支持 CPU、NVIDIA NVENC、Intel QSV、AMD AMF 编码。
+- 支持目标编码 H.264、HEVC/H.265、AV1。
+- AV1 自动使用 Main 配置并跳过 `profile` 参数。
+- 可选分辨率转换。
+- 支持目标码率、最高码率和自动计算的缓冲区大小（最高码率的 2 倍）。
+- 支持音频复制、忽略或自定义编码参数。
+- 支持字幕复制、跳过或自定义编码参数。
+- 处理前检测源视频编码，检测成功后等待 2 秒，便于确认输入信息。
+- 没有视频流或视频编码检测失败的文件会跳过转码。
 
-### 2️⃣ `encode.bat` —— 视频转码/压缩模块
-* 支持：H.264 / HEVC(H.265) / AV1
-* **解码方式**：CPU、NVIDIA CUVID、Intel QSV、AMD AMF
-* **编码方式**：CPU、NVENC、QSV、AMF
-* 可选 **profile（main/high/high10/main10）**
-* 分辨率可自定义（scale）
-* 完整码率控制（b:v / maxrate / bufsize）
-* 音频支持：复制、忽略、自定义编码
-* 字幕支持：复制、跳过、自定义
-* 自动批处理 input 文件夹
+#### 目标容器
 
-### 3️⃣ `mp4_to_gif.bat` —— MP4 批量转 GIF
-* 可自定义分辨率
-* 可调帧率（10–15 推荐）
-* 批量处理 input 目录
-* 输出为 GIF 文件到 output 目录
+转码时可以选择目标容器，输出扩展名和 FFmpeg muxer 会根据选择确定，不再沿用输入文件扩展名。
 
-### 4️⃣ `extract_separate.bat` —— 视频/音频分离模块
-* **提取纯视频流**（不含音频，零损耗复制）
-* **自动检测所有音轨**
-* **新增**：自动匹配正确扩展名（m4a/mp3/ogg/flac/dts 等）
-* 多音轨逐个提取并命名为：
-  ```
+| 容器 | 扩展名 | 说明 |
+| --- | --- | --- |
+| MKV | `.mkv` | 默认选项，兼容性最好，支持多音轨、ASS 字幕和字体附件 |
+| MP4 | `.mp4` | ASS 字幕自动转换为 `mov_text`，不复制字体附件；音频保持 `-c:a copy` |
+| WebM | `.webm` | 仅允许 AV1 目标编码；音频自动转换为 Opus，字幕自动转换为 WebVTT，不复制字体附件 |
+
+脚本会显式指定 `-f matroska`、`-f mp4` 或 `-f webm`，避免仅依赖文件扩展名选择 muxer。
+
+### 2. MP4 转 GIF
+
+脚本：`batch-files/mp4_to_gif.bat`
+
+- 支持自定义 GIF 分辨率和帧率。
+- 使用 `palettegen` + `paletteuse` 调色板流程，改善颜色数量、色带和抖动问题。
+- 使用 Lanczos 缩放。
+- 自动添加 `-an`，明确移除音频。
+- 自动添加 `-loop 0`，生成无限循环 GIF。
+- 批量处理 `input` 目录中的视频文件，输出到 `output` 目录。
+
+### 3. 分离视频和音频流
+
+脚本：`batch-files/extract_separate.bat`
+
+- 视频输出为纯视频流，使用 `-c:v copy -an -sn -dn`，不包含音频、字幕或数据流。
+- 自动检测所有音轨并逐条提取。
+- 使用 `ffprobe -v error` 检测音频编码，检测失败时跳过音频提取，不会把错误文本当作 codec 名称。
+- 音频文件输出到 `audio-out`，文件名格式为：
+
+  ```text
   文件名-audio1.m4a
   文件名-audio2.ac3
-  ...
-  ```
-* 视频文件输出为：
-  ```
-  文件名-video-only.mp4
   ```
 
----
+- 根据 codec 映射扩展名和 muxer，常见映射包括：
+  - `aac`、`alac` -> `.m4a`
+  - `mp3` -> `.mp3`
+  - `opus` -> `.opus`
+  - `vorbis`、`speex` -> `.ogg`
+  - `flac` -> `.flac`
+  - `ac3`、`eac3`、`dts` -> 对应原始扩展名
+  - `truehd` -> `.thd`
+  - `mlp` -> `.mlp`
+  - `amr_nb` -> `.amr`
+  - `g722`、`adpcm_g722` -> `.g722`
+  - 小端 PCM -> `.wav`
+  - 大端 PCM -> `.aiff`
+  - 其他未知或不适合独立容器的音频 -> `.mka`
 
-## 作者使用的 FFmpeg 版本（推荐）
+`.gitkeep` 文件会自动跳过。输入目录中包含纯音频文件时，分离脚本会报告视频提取失败，但仍会继续提取音频。
 
-下载链接：
+## 使用方法
 
-👉 **Windows FFmpeg Release Full（latest release version: 8.1 2026-03-16）**
-[https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z](https://www.gyan.dev/ffmpeg/builds/ffmpeg-release-full.7z)
+1. 将待处理的视频放入 `input` 目录。
+2. 双击运行 `main.bat`。
+3. 选择功能并按提示设置参数。
+4. 视频和 GIF 输出到 `output`，分离出的音频输出到 `audio-out`。
 
-下载后解压，将 `bin/` 加入系统 PATH 即可。
+## 环境要求
 
----
+- Windows。
+- FFmpeg 和 FFprobe 已安装并加入系统 `PATH`。
+- 使用 NVIDIA、Intel 或 AMD 硬件加速时，需要对应的驱动和 FFmpeg 编解码器支持。
+- 可使用 MediaInfo 或 FFprobe 查看源文件的详细流信息。
 
-## 📘 使用方法
+推荐使用包含完整编码器和硬件支持的 FFmpeg Release Full Build。
 
-### 1. 将文件放入 `input/`
+## 注意事项
 
-支持任意格式（mp4/mkv/mov/flac/mp3/m4a……）
-
-`.gitkeep` 文件会自动忽略。
-
----
-
-### 2. 运行 `main.bat`
-
-选择功能：
-
-| 选项 | 功能脚本                               |
-| -- | ---------------------------------- |
-| 1  | 批量视频转码/压缩（encode.bat）                 |
-| 2  | MP4 批量转 GIF（mp4_to_gif.bat）        |
-| 3  | 分离视频 + 多音轨提取（extract_separate.bat） |
-
----
-
-### 3. 按提示设置参数
-
-（分辨率、帧率、profile、编码器、码率……）
-
----
-
-### 4. 开始处理
-
-输出到：
-
-* `output/`
-* `audio-out/`（仅音频提取脚本使用）
-
----
-
-## ⚠️ 注意事项
-
-1. **硬件加速需要显卡驱动支持**
-2. CPU 软编码兼容性最佳但速度较慢
-3. GIF 文件体积通常较大，选择分辨率与帧率要谨慎
-4. 若需要检测源文件信息，推荐使用 MediaInfo
+- MKV 是默认且兼容性最好的目标容器。
+- MP4 音频使用复制模式时，源音频必须是 MP4 兼容格式；不兼容的音频需要在“自定义音频参数”中重新编码为 AAC 等格式。
+- WebM 只允许 AV1 视频目标编码，并会自动使用 Opus 音频和 WebVTT 字幕。
+- GIF 体积通常较大，降低分辨率和帧率可以明显减小文件大小。
+- 已存在的输出文件可能会触发 FFmpeg 覆盖确认。
